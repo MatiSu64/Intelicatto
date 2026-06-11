@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>InteliCatto</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #f5f5f5;
+}
+
+/* APP LAYOUT */
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* MENÚ */
+#menu {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* IMAGEN FIJA */
+#menu img {
+    width: min(60vw, 260px);
+    height: auto;
+    margin-bottom: 15px;
+}
+
+/* GAME */
+#game {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px;
+    overflow: hidden;
+}
+
+/* TIMER */
+#timer {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 4px 0;
+}
+
+/* GRID 🔥 FIX REAL */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+
+    width: 95vw;
+    max-width: 420px;
+
+    flex: 1;
+    align-content: center;
+}
+
+/* CARD */
+.card {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+    cursor: pointer;
+}
+
+.card-inner {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+}
+
+.card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+
+.face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: clamp(1.2rem, 5vw, 2.5rem);
+    backface-visibility: hidden;
+}
+
+.front { background: #3498db; }
+.back {
+    background: #e74c3c;
+    transform: rotateY(180deg);
+}
+
+.matched .front {
+    background: #2ecc71;
+}
+
+/* MENÚS FINAL */
+#victory, #gameover {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+button {
+    padding: 14px 30px;
+    font-size: 1.2rem;
+    border: none;
+    border-radius: 12px;
+    background: #3498db;
+    color: white;
+    margin: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- MENÚ -->
+<div id="menu">
+    <img src="catto1.png" alt="cat">
+    <h1>InteliCatto</h1>
+    <button onclick="startGame()">Play</button>
+</div>
+
+<!-- GAME -->
+<div id="game">
+    <div id="timer">50</div>
+    <div class="grid" id="grid"></div>
+</div>
+
+<!-- VICTORIA -->
+<div id="victory">
+    <h1>🏆 Ganaste</h1>
+    <button onclick="goMenu()">Menú</button>
+    <button onclick="restart()">Reintentar</button>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover">
+    <h1>💀 Perdiste</h1>
+    <button onclick="goMenu()">Menú</button>
+    <button onclick="restart()">Reintentar</button>
+</div>
+
+<script>
+
+let first = null;
+let second = null;
+let lock = false;
+let matched = 0;
+
+let time = 50;
+let interval = null;
+
+const cards = [
+    '🍎','🍎','🍌','🍌','🍇','🍇','🍓','🍓',
+    '🍒','🍒','🍍','🍍','🥝','🥝','🍉','🍉'
+];
+
+/* FULLSCREEN */
+function enterFullscreen() {
+    let e = document.documentElement;
+    if (e.requestFullscreen) e.requestFullscreen();
+}
+
+function exitFullscreen() {
+    if (document.exitFullscreen) document.exitFullscreen();
+}
+
+/* START */
+function startGame() {
+    enterFullscreen();
+
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("victory").style.display = "none";
+    document.getElementById("gameover").style.display = "none";
+    document.getElementById("game").style.display = "flex";
+
+    resetGame();
+    shuffle(cards);
+    createBoard();
+    startTimer();
+}
+
+/* TIMER */
+function startTimer() {
+    time = 50;
+    document.getElementById("timer").innerText = time;
+
+    clearInterval(interval);
+
+    interval = setInterval(() => {
+        time--;
+        document.getElementById("timer").innerText = time;
+
+        if (time <= 0) {
+            clearInterval(interval);
+            showGameOver();
+        }
+    }, 1000);
+}
+
+/* GAME OVER */
+function showGameOver() {
+    document.getElementById("game").style.display = "none";
+    document.getElementById("gameover").style.display = "flex";
+}
+
+/* VICTORY */
+function showVictory() {
+    document.getElementById("game").style.display = "none";
+    document.getElementById("victory").style.display = "flex";
+}
+
+/* MENU */
+function goMenu() {
+    exitFullscreen();
+
+    document.getElementById("menu").style.display = "flex";
+    document.getElementById("game").style.display = "none";
+    document.getElementById("victory").style.display = "none";
+    document.getElementById("gameover").style.display = "none";
+
+    resetGame();
+}
+
+/* RESTART */
+function restart() {
+    goMenu();
+    setTimeout(startGame, 200);
+}
+
+/* BOARD */
+function createBoard() {
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    cards.forEach(symbol => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.dataset.symbol = symbol;
+
+        card.innerHTML = `
+            <div class="card-inner">
+                <div class="face front"></div>
+                <div class="face back">${symbol}</div>
+            </div>
+        `;
+
+        card.addEventListener("click", flip);
+        grid.appendChild(card);
+    });
+}
+
+/* FLIP */
+function flip() {
+    if (lock || this.classList.contains("matched") || this === first) return;
+
+    this.classList.add("flipped");
+
+    if (!first) {
+        first = this;
+        return;
+    }
+
+    second = this;
+    lock = true;
+
+    check();
+}
+
+/* CHECK */
+function check() {
+    if (first.dataset.symbol === second.dataset.symbol) {
+
+        first.classList.add("matched");
+        second.classList.add("matched");
+
+        matched++;
+
+        if (matched === cards.length / 2) {
+            clearInterval(interval);
+            setTimeout(showVictory, 300);
+        }
+
+        resetPair();
+
+    } else {
+        setTimeout(() => {
+            first.classList.remove("flipped");
+            second.classList.remove("flipped");
+            resetPair();
+        }, 700);
+    }
+}
+
+/* RESET */
+function resetPair() {
+    first = null;
+    second = null;
+    lock = false;
+}
+
+function resetGame() {
+    first = null;
+    second = null;
+    lock = false;
+    matched = 0;
+    clearInterval(interval);
+}
+
+/* SHUFFLE */
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+}
+
+</script>
+
+</body>
+</html>
